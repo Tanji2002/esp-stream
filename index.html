@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ESP Stream Fast Monitor & Control</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #0f172a; color: #f8fafc; text-align: center; margin: 0; padding: 20px; }
+    h1 { color: #38bdf8; }
+    .card { background: #1e293b; border-radius: 12px; padding: 20px; max-width: 700px; margin: 20px auto; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
+    .val-box { font-size: 3rem; font-weight: bold; color: #4ade80; margin: 10px 0; }
+    .btn { background: #0284c7; color: white; border: none; padding: 14px 32px; font-size: 1.2rem; font-weight: bold; border-radius: 8px; cursor: pointer; margin: 8px; }
+    .btn:hover { background: #0369a1; }
+    .btn-off { background: #ef4444; }
+    .btn-off:hover { background: #dc2626; }
+    canvas { max-height: 350px; }
+  </style>
+</head>
+<body>
+
+  <h1>ESP Stream Live Control</h1>
+
+  <div class="card">
+    <h2>LDR Raw Value</h2>
+    <div class="val-box" id="ldrVal">0</div>
+    <canvas id="ldrChart"></canvas>
+  </div>
+
+  <div class="card">
+    <h2>Remote Switch Control</h2>
+    <button class="btn" onclick="setLED(1)">TURN ON</button>
+    <button class="btn btn-off" onclick="setLED(0)">TURN OFF</button>
+  </div>
+
+  <script>
+    const FIREBASE_URL = "https://esp-stream-e1407-default-rtdb.asia-southeast1.firebasedatabase.app/";
+
+    const ctx = document.getElementById('ldrChart').getContext('2d');
+    const maxPoints = 50;
+    let chartData = new Array(maxPoints).fill(0);
+    let chartLabels = new Array(maxPoints).fill('');
+
+    const chart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: chartLabels,
+        datasets: [{
+          label: 'LDR Reading',
+          data: chartData,
+          borderColor: '#38bdf8',
+          backgroundColor: 'rgba(56, 189, 248, 0.1)',
+          fill: true,
+          tension: 0.2,
+          pointRadius: 0
+        }]
+      },
+      options: {
+        animation: false, // Turn off heavy animations for high-speed performance
+        scales: {
+          y: { min: 0, max: 4095, grid: { color: '#334155' } },
+          x: { grid: { color: '#334155' } }
+        }
+      }
+    });
+
+    async function fetchLDR() {
+      try {
+        const res = await fetch(FIREBASE_URL + "ldr.json");
+        const val = await res.json();
+        if (val !== null) {
+          document.getElementById('ldrVal').innerText = val;
+          chartData.shift();
+          chartData.push(val);
+          chart.update('none'); // Fast update without rendering lag
+        }
+      } catch (err) {
+        console.error("Firebase error:", err);
+      }
+    }
+
+    async function setLED(state) {
+      try {
+        await fetch(FIREBASE_URL + "led.json", {
+          method: "PUT",
+          body: JSON.stringify(state)
+        });
+      } catch (err) {
+        console.error("Write error:", err);
+      }
+    }
+
+    // Refresh every 200ms (5 times per second)
+    setInterval(fetchLDR, 200);
+  </script>
+</body>
+</html>
