@@ -3,39 +3,60 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ESP Stream Fast Monitor & Control</title>
+  <title>ESP Stream Live Control Hub</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
-    body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #0f172a; color: #f8fafc; text-align: center; margin: 0; padding: 20px; }
-    h1 { color: #38bdf8; }
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0f172a; color: #f8fafc; text-align: center; margin: 0; padding: 20px; }
+    h1 { color: #38bdf8; margin-bottom: 20px; }
     .card { background: #1e293b; border-radius: 12px; padding: 20px; max-width: 700px; margin: 20px auto; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
     .val-box { font-size: 3rem; font-weight: bold; color: #4ade80; margin: 10px 0; }
-    .btn { background: #0284c7; color: white; border: none; padding: 14px 32px; font-size: 1.2rem; font-weight: bold; border-radius: 8px; cursor: pointer; margin: 8px; }
+    .btn { background: #0284c7; color: white; border: none; padding: 14px 32px; font-size: 1.2rem; font-weight: bold; border-radius: 8px; cursor: pointer; margin: 8px; transition: 0.2s; }
     .btn:hover { background: #0369a1; }
     .btn-off { background: #ef4444; }
     .btn-off:hover { background: #dc2626; }
-    canvas { max-height: 350px; }
+    
+    /* Slider Styling */
+    .slider-container { margin: 20px 0; }
+    .slider { -webkit-appearance: none; width: 80%; height: 10px; border-radius: 5px; background: #334155; outline: none; opacity: 0.9; transition: opacity .2s; }
+    .slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 24px; height: 24px; border-radius: 50%; background: #38bdf8; cursor: pointer; }
+    .slider-val { font-size: 1.5rem; font-weight: bold; color: #38bdf8; margin-top: 10px; }
+    
+    canvas { max-height: 320px; }
   </style>
 </head>
 <body>
 
-  <h1>ESP Stream Live Control</h1>
+  <h1>ESP Stream Monitor & LED Control</h1>
 
+  <!-- Sensor Live Chart Card -->
   <div class="card">
     <h2>LDR Raw Value</h2>
     <div class="val-box" id="ldrVal">0</div>
     <canvas id="ldrChart"></canvas>
   </div>
 
+  <!-- Output & Speed Control Card -->
   <div class="card">
-    <h2>Remote Switch Control</h2>
-    <button class="btn" onclick="setLED(1)">TURN ON</button>
-    <button class="btn btn-off" onclick="setLED(0)">TURN OFF</button>
+    <h2>Remote Switch & Blink Speed</h2>
+    
+    <!-- ON / OFF Buttons -->
+    <div>
+      <button class="btn" onclick="setLED(1)">TURN ON</button>
+      <button class="btn btn-off" onclick="setLED(0)">TURN OFF</button>
+    </div>
+
+    <!-- Blink Speed Wheel Slider -->
+    <div class="slider-container">
+      <h3>Blink Delay (Speed)</h3>
+      <input type="range" min="50" max="1000" step="10" value="300" class="slider" id="speedRange" oninput="updateSpeedLabel(this.value)" onchange="sendSpeedToFirebase(this.value)">
+      <div class="slider-val"><span id="speedDisplay">300</span> ms</div>
+    </div>
   </div>
 
   <script>
     const FIREBASE_URL = "https://esp-stream-e1407-default-rtdb.asia-southeast1.firebasedatabase.app/";
 
+    // Setup Chart.js
     const ctx = document.getElementById('ldrChart').getContext('2d');
     const maxPoints = 50;
     let chartData = new Array(maxPoints).fill(0);
@@ -56,7 +77,7 @@
         }]
       },
       options: {
-        animation: false, // Turn off heavy animations for high-speed performance
+        animation: false,
         scales: {
           y: { min: 0, max: 4095, grid: { color: '#334155' } },
           x: { grid: { color: '#334155' } }
@@ -64,6 +85,7 @@
       }
     });
 
+    // Fetch LDR from Firebase (Every 200ms)
     async function fetchLDR() {
       try {
         const res = await fetch(FIREBASE_URL + "ldr.json");
@@ -72,13 +94,14 @@
           document.getElementById('ldrVal').innerText = val;
           chartData.shift();
           chartData.push(val);
-          chart.update('none'); // Fast update without rendering lag
+          chart.update('none');
         }
       } catch (err) {
         console.error("Firebase error:", err);
       }
     }
 
+    // Set LED ON/OFF State
     async function setLED(state) {
       try {
         await fetch(FIREBASE_URL + "led.json", {
@@ -86,11 +109,27 @@
           body: JSON.stringify(state)
         });
       } catch (err) {
-        console.error("Write error:", err);
+        console.error("LED write error:", err);
       }
     }
 
-    // Refresh every 200ms (5 times per second)
+    // Update Slider UI display
+    function updateSpeedLabel(val) {
+      document.getElementById('speedDisplay').innerText = val;
+    }
+
+    // Send Speed Value to Firebase
+    async function sendSpeedToFirebase(val) {
+      try {
+        await fetch(FIREBASE_URL + "speed.json", {
+          method: "PUT",
+          body: JSON.stringify(parseInt(val))
+        });
+      } catch (err) {
+        console.error("Speed write error:", err);
+      }
+    }
+
     setInterval(fetchLDR, 200);
   </script>
 </body>
