@@ -3,134 +3,241 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ESP Stream Live Control Hub</title>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <title>Hayleys Fabric Water Treatment Plant SCADA</title>
   <style>
-    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0f172a; color: #f8fafc; text-align: center; margin: 0; padding: 20px; }
-    h1 { color: #38bdf8; margin-bottom: 20px; }
-    .card { background: #1e293b; border-radius: 12px; padding: 20px; max-width: 700px; margin: 20px auto; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
-    .val-box { font-size: 3rem; font-weight: bold; color: #4ade80; margin: 10px 0; }
-    .btn { background: #0284c7; color: white; border: none; padding: 14px 32px; font-size: 1.2rem; font-weight: bold; border-radius: 8px; cursor: pointer; margin: 8px; transition: 0.2s; }
-    .btn:hover { background: #0369a1; }
-    .btn-off { background: #ef4444; }
-    .btn-off:hover { background: #dc2626; }
+    :root {
+      --bg: #0b1120;
+      --card-bg: #151e32;
+      --border: #263554;
+      --accent-blue: #0284c7;
+      --cyan: #38bdf8;
+      --green: #22c55e;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --text: #f8fafc;
+      --subtext: #94a3b8;
+    }
+
+    body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 15px; }
     
-    /* Slider Styling */
-    .slider-container { margin: 20px 0; }
-    .slider { -webkit-appearance: none; width: 80%; height: 10px; border-radius: 5px; background: #334155; outline: none; opacity: 0.9; transition: opacity .2s; }
-    .slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 24px; height: 24px; border-radius: 50%; background: #38bdf8; cursor: pointer; }
-    .slider-val { font-size: 1.5rem; font-weight: bold; color: #38bdf8; margin-top: 10px; }
+    /* SCADA Header */
+    .header { background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; padding: 15px 25px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 20px rgba(0,0,0,0.5); }
+    .header h1 { margin: 0; font-size: 1.6rem; color: var(--cyan); letter-spacing: 1px; }
+    .status-pill { background: rgba(34, 197, 94, 0.15); border: 1px solid var(--green); color: var(--green); padding: 6px 14px; border-radius: 20px; font-weight: bold; font-size: 0.9rem; display: flex; align-items: center; gap: 8px; }
+    .dot { width: 10px; height: 10px; background: var(--green); border-radius: 50%; animation: blink 1.2s infinite; }
+
+    /* Layout Grid */
+    .section-title { color: var(--subtext); text-transform: uppercase; letter-spacing: 1.5px; font-size: 0.9rem; margin: 25px 0 10px 5px; font-weight: bold; }
+    .grid-4 { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 15px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 15px; }
+
+    /* Tank SCADA Card */
+    .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 18px; text-align: center; position: relative; }
+    .tank-visual { width: 100px; height: 160px; border: 3px solid #334155; border-radius: 12px 12px 6px 6px; margin: 15px auto; position: relative; overflow: hidden; background: #0f172a; }
+    .tank-liquid { position: absolute; bottom: 0; width: 100%; height: 0%; background: linear-gradient(180deg, #38bdf8, #0284c7); transition: height 0.5s ease-in-out; }
+    .tank-wave { position: absolute; top: -8px; width: 200%; height: 12px; background: rgba(255,255,255,0.3); border-radius: 50%; animation: wave 2s linear infinite; }
     
-    canvas { max-height: 320px; }
+    .val-large { font-size: 1.8rem; font-weight: bold; color: var(--cyan); }
+    .val-sub { font-size: 1rem; color: var(--subtext); margin-top: 4px; }
+
+    /* Sand Filter SCADA Card */
+    .filter-card { border-top: 4px solid var(--cyan); }
+    .tag-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+    .tag-box { background: #0f172a; border: 1px solid var(--border); border-radius: 8px; padding: 10px; text-align: center; }
+    .tag-label { font-size: 0.75rem; color: var(--subtext); text-transform: uppercase; }
+    .tag-val { font-size: 1.2rem; font-weight: bold; color: var(--text); margin-top: 2px; }
+    .dp-box { grid-column: span 2; background: rgba(2, 132, 199, 0.15); border-color: var(--cyan); }
+    .dp-box .tag-val { color: var(--cyan); font-size: 1.4rem; }
+
+    /* Alarm Panel */
+    .alarm-panel { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-top: 25px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; }
+    .alarm-status { display: flex; align-items: center; gap: 15px; }
+    .alarm-badge { padding: 10px 20px; border-radius: 8px; font-weight: bold; font-size: 1.1rem; background: rgba(34, 197, 94, 0.2); color: var(--green); border: 1px solid var(--green); }
+    .alarm-badge.active { background: rgba(239, 68, 68, 0.2); color: var(--danger); border-color: var(--danger); animation: pulse 0.8s infinite alternate; }
+
+    .btn-alarm { background: var(--danger); color: white; border: none; padding: 12px 25px; font-size: 1rem; font-weight: bold; border-radius: 8px; cursor: pointer; transition: 0.2s; }
+    .btn-alarm:hover { background: #dc2626; }
+
+    @keyframes wave { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
+    @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+    @keyframes pulse { from { opacity: 0.6; } to { opacity: 1; } }
   </style>
 </head>
 <body>
 
-  <h1>ESP Stream Monitor & LED Control</h1>
-
-  <!-- Sensor Live Chart Card -->
-  <div class="card">
-    <h2>LDR Raw Value</h2>
-    <div class="val-box" id="ldrVal">0</div>
-    <canvas id="ldrChart"></canvas>
+  <!-- SCADA Header -->
+  <div class="header">
+    <div>
+      <h1>HAYLEYS FABRIC WATER TREATMENT PLANT</h1>
+      <div style="color: var(--subtext); font-size: 0.85rem; margin-top: 4px;">SCADA Central Monitoring & Control System</div>
+    </div>
+    <div class="status-pill"><div class="dot"></div> SCADA LIVE</div>
   </div>
 
-  <!-- Output & Speed Control Card -->
-  <div class="card">
-    <h2>Remote Switch & Blink Speed</h2>
-    
-    <!-- ON / OFF Buttons -->
-    <div>
-      <button class="btn" onclick="setLED(1)">TURN ON</button>
-      <button class="btn btn-off" onclick="setLED(0)">TURN OFF</button>
+  <!-- Section 1: Water Tanks -->
+  <div class="section-title">Water Storage Tanks Battery</div>
+  <div class="grid-4">
+    <!-- Tank 1 -->
+    <div class="card">
+      <h3>Tank 01</h3>
+      <div style="color:var(--subtext); font-size:0.85rem;">Capacity: 200 m³</div>
+      <div class="tank-visual">
+        <div class="tank-liquid" id="t1Bar"><div class="tank-wave"></div></div>
+      </div>
+      <div class="val-large"><span id="t1Pct">0.0</span> %</div>
+      <div class="val-sub"><span id="t1Vol">0.0</span> m³</div>
     </div>
 
-    <!-- Blink Speed Wheel Slider -->
-    <div class="slider-container">
-      <h3>Blink Delay (Speed)</h3>
-      <input type="range" min="50" max="1000" step="10" value="300" class="slider" id="speedRange" oninput="updateSpeedLabel(this.value)" onchange="sendSpeedToFirebase(this.value)">
-      <div class="slider-val"><span id="speedDisplay">300</span> ms</div>
+    <!-- Tank 2 -->
+    <div class="card">
+      <h3>Tank 02</h3>
+      <div style="color:var(--subtext); font-size:0.85rem;">Capacity: 200 m³</div>
+      <div class="tank-visual">
+        <div class="tank-liquid" id="t2Bar"><div class="tank-wave"></div></div>
+      </div>
+      <div class="val-large"><span id="t2Pct">0.0</span> %</div>
+      <div class="val-sub"><span id="t2Vol">0.0</span> m³</div>
+    </div>
+
+    <!-- Tank 3 -->
+    <div class="card">
+      <h3>Tank 03</h3>
+      <div style="color:var(--subtext); font-size:0.85rem;">Capacity: 200 m³</div>
+      <div class="tank-visual">
+        <div class="tank-liquid" id="t3Bar"><div class="tank-wave"></div></div>
+      </div>
+      <div class="val-large"><span id="t3Pct">0.0</span> %</div>
+      <div class="val-sub"><span id="t3Vol">0.0</span> m³</div>
+    </div>
+
+    <!-- Tank 4 -->
+    <div class="card">
+      <h3>Tank 04</h3>
+      <div style="color:var(--subtext); font-size:0.85rem;">Capacity: 600 m³</div>
+      <div class="tank-visual">
+        <div class="tank-liquid" id="t4Bar"><div class="tank-wave"></div></div>
+      </div>
+      <div class="val-large"><span id="t4Pct">0.0</span> %</div>
+      <div class="val-sub"><span id="t4Vol">0.0</span> m³</div>
+    </div>
+  </div>
+
+  <!-- Section 2: Sand Filters -->
+  <div class="section-title">Sand Filters Battery & Pressure Sensors</div>
+  <div style="background: var(--card-bg); padding: 12px; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 15px; display: inline-block;">
+    <span style="color: var(--subtext);">Common Inlet Header Pressure: </span>
+    <strong style="color: var(--cyan); font-size: 1.2rem;" id="pIn">0.00 bar</strong>
+  </div>
+
+  <div class="grid-3">
+    <!-- Filter 1 -->
+    <div class="card filter-card">
+      <h3>Sand Filter 01</h3>
+      <div class="tag-grid">
+        <div class="tag-box"><div class="tag-label">Inlet Pressure</div><div class="tag-val" id="f1Pin">0.00 bar</div></div>
+        <div class="tag-box"><div class="tag-label">Outlet Pressure</div><div class="tag-val" id="f1Pout">0.00 bar</div></div>
+        <div class="tag-box dp-box"><div class="tag-label">Differential Pressure (ΔP)</div><div class="tag-val" id="dp1">0.00 bar</div></div>
+      </div>
+    </div>
+
+    <!-- Filter 2 -->
+    <div class="card filter-card">
+      <h3>Sand Filter 02</h3>
+      <div class="tag-grid">
+        <div class="tag-box"><div class="tag-label">Inlet Pressure</div><div class="tag-val" id="f2Pin">0.00 bar</div></div>
+        <div class="tag-box"><div class="tag-label">Outlet Pressure</div><div class="tag-val" id="f2Pout">0.00 bar</div></div>
+        <div class="tag-box dp-box"><div class="tag-label">Differential Pressure (ΔP)</div><div class="tag-val" id="dp2">0.00 bar</div></div>
+      </div>
+    </div>
+
+    <!-- Filter 3 -->
+    <div class="card filter-card">
+      <h3>Sand Filter 03</h3>
+      <div class="tag-grid">
+        <div class="tag-box"><div class="tag-label">Inlet Pressure</div><div class="tag-val" id="f3Pin">0.00 bar</div></div>
+        <div class="tag-box"><div class="tag-label">Outlet Pressure</div><div class="tag-val" id="f3Pout">0.00 bar</div></div>
+        <div class="tag-box dp-box"><div class="tag-label">Differential Pressure (ΔP)</div><div class="tag-val" id="dp3">0.00 bar</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Section 3: Alarm Panel -->
+  <div class="alarm-panel">
+    <div class="alarm-status">
+      <div>
+        <h3 style="margin:0;">12V Siren Alarm System</h3>
+        <div style="color:var(--subtext); font-size:0.85rem; margin-top:2px;">Automated ΔP threshold & manual buzzer trigger test</div>
+      </div>
+      <div class="alarm-badge" id="alarmBadge">SYSTEM NORMAL</div>
+    </div>
+    <div>
+      <button class="btn-alarm" id="alarmBtn" onclick="toggleWebAlarm()">TEST ALARM BUZZER</button>
     </div>
   </div>
 
   <script>
     const FIREBASE_URL = "https://esp-stream-e1407-default-rtdb.asia-southeast1.firebasedatabase.app/";
+    let currentAlarmTriggerState = 0;
 
-    // Setup Chart.js
-    const ctx = document.getElementById('ldrChart').getContext('2d');
-    const maxPoints = 50;
-    let chartData = new Array(maxPoints).fill(0);
-    let chartLabels = new Array(maxPoints).fill('');
-
-    const chart = new Chart(ctx, {
-      type: 'line',
-      data: {
-        labels: chartLabels,
-        datasets: [{
-          label: 'LDR Reading',
-          data: chartData,
-          borderColor: '#38bdf8',
-          backgroundColor: 'rgba(56, 189, 248, 0.1)',
-          fill: true,
-          tension: 0.2,
-          pointRadius: 0
-        }]
-      },
-      options: {
-        animation: false,
-        scales: {
-          y: { min: 0, max: 4095, grid: { color: '#334155' } },
-          x: { grid: { color: '#334155' } }
-        }
-      }
-    });
-
-    // Fetch LDR from Firebase (Every 200ms)
-    async function fetchLDR() {
+    async function fetchSCADAData() {
       try {
-        const res = await fetch(FIREBASE_URL + "ldr.json");
-        const val = await res.json();
-        if (val !== null) {
-          document.getElementById('ldrVal').innerText = val;
-          chartData.shift();
-          chartData.push(val);
-          chart.update('none');
+        const res = await fetch(FIREBASE_URL + "plant_data.json");
+        const data = await res.json();
+
+        if (data) {
+          // Update Tanks
+          updateTank('t1', data.t1_pct, data.t1_vol);
+          updateTank('t2', data.t2_pct, data.t2_vol);
+          updateTank('t3', data.t3_pct, data.t3_vol);
+          updateTank('t4', data.t4_pct, data.t4_vol);
+
+          // Update Pressures
+          document.getElementById('pIn').innerText = data.p_in.toFixed(2) + " bar";
+          document.getElementById('f1Pin').innerText = data.p_in.toFixed(2) + " bar";
+          document.getElementById('f2Pin').innerText = data.p_in.toFixed(2) + " bar";
+          document.getElementById('f3Pin').innerText = data.p_in.toFixed(2) + " bar";
+
+          document.getElementById('f1Pout').innerText = data.p_out1.toFixed(2) + " bar";
+          document.getElementById('f2Pout').innerText = data.p_out2.toFixed(2) + " bar";
+          document.getElementById('f3Pout').innerText = data.p_out3.toFixed(2) + " bar";
+
+          document.getElementById('dp1').innerText = data.dp1.toFixed(2) + " bar";
+          document.getElementById('dp2').innerText = data.dp2.toFixed(2) + " bar";
+          document.getElementById('dp3').innerText = data.dp3.toFixed(2) + " bar";
+
+          // Alarm State
+          const badge = document.getElementById('alarmBadge');
+          if (data.alarm === 1) {
+            badge.innerText = "ALARM ACTIVE!";
+            badge.classList.add('active');
+          } else {
+            badge.innerText = "SYSTEM NORMAL";
+            badge.classList.remove('active');
+          }
         }
       } catch (err) {
-        console.error("Firebase error:", err);
+        console.error("SCADA Read Error:", err);
       }
     }
 
-    // Set LED ON/OFF State
-    async function setLED(state) {
-      try {
-        await fetch(FIREBASE_URL + "led.json", {
-          method: "PUT",
-          body: JSON.stringify(state)
-        });
-      } catch (err) {
-        console.error("LED write error:", err);
-      }
+    function updateTank(id, pct, vol) {
+      document.getElementById(id + 'Bar').style.height = pct + '%';
+      document.getElementById(id + 'Pct').innerText = pct.toFixed(1);
+      document.getElementById(id + 'Vol').innerText = vol.toFixed(1);
     }
 
-    // Update Slider UI display
-    function updateSpeedLabel(val) {
-      document.getElementById('speedDisplay').innerText = val;
+    async function toggleWebAlarm() {
+      currentAlarmTriggerState = currentAlarmTriggerState === 0 ? 1 : 0;
+      const btn = document.getElementById('alarmBtn');
+      btn.innerText = currentAlarmTriggerState === 1 ? "SILENCE ALARM" : "TEST ALARM BUZZER";
+      
+      await fetch(FIREBASE_URL + "alarm_trigger.json", {
+        method: "PUT",
+        body: JSON.stringify(currentAlarmTriggerState)
+      });
     }
 
-    // Send Speed Value to Firebase
-    async function sendSpeedToFirebase(val) {
-      try {
-        await fetch(FIREBASE_URL + "speed.json", {
-          method: "PUT",
-          body: JSON.stringify(parseInt(val))
-        });
-      } catch (err) {
-        console.error("Speed write error:", err);
-      }
-    }
-
-    setInterval(fetchLDR, 200);
+    setInterval(fetchSCADAData, 250);
   </script>
 </body>
 </html>
